@@ -3,4 +3,4 @@
 mod argument;
 
 mod request;
-pub use request::{Operation, Request, RequestError};
+pub use request::{Operation, Request};
