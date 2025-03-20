@@ -6,12 +6,12 @@
 //! data without cloning the data. A reply *must always* be used (by calling either ok() or
 //! error() exactly once).
 
-use fuse_abi::fuse_getxattr_out;
+use fuse_abi::FuseGetxattrOut;
 #[cfg(target_os = "macos")]
 use fuse_abi::fuse_getxtimes_out;
-use fuse_abi::{fuse_attr, fuse_attr_out, fuse_entry_out, fuse_file_lock, fuse_kstatfs};
-use fuse_abi::{fuse_bmap_out, fuse_lk_out, fuse_open_out, fuse_statfs_out, fuse_write_out};
-use fuse_abi::{fuse_dirent, fuse_out_header};
+use fuse_abi::{FuseAttr, FuseAttrOut, FuseEntryOut, FuseFileLock, FuseKstatfs};
+use fuse_abi::{FuseBmapOut, FuseLkOut, FuseOpenOut, FuseStatfsOut, FuseWriteOut};
+use fuse_abi::{FuseDirent, FuseOutHeader};
 use libc::{c_int, EIO, S_IFBLK, S_IFCHR, S_IFDIR, S_IFIFO, S_IFLNK, S_IFREG, S_IFSOCK};
 use log::warn;
 use std::convert::AsRef;
@@ -78,14 +78,14 @@ fn mode_from_kind_and_perm(kind: FileType, perm: u16) -> u32 {
 
 /// Returns a fuse_attr from FileAttr
 #[cfg(target_os = "macos")]
-fn fuse_attr_from_attr(attr: &FileAttr) -> fuse_attr {
+fn fuse_attr_from_attr(attr: &FileAttr) -> FuseAttr {
     // FIXME: unwrap may panic, use unwrap_or((0, 0)) or return a result instead?
     let (atime_secs, atime_nanos) = time_from_system_time(&attr.atime).unwrap();
     let (mtime_secs, mtime_nanos) = time_from_system_time(&attr.mtime).unwrap();
     let (ctime_secs, ctime_nanos) = time_from_system_time(&attr.ctime).unwrap();
     let (crtime_secs, crtime_nanos) = time_from_system_time(&attr.crtime).unwrap();
 
-    fuse_attr {
+    FuseAttr {
         ino: attr.ino,
         size: attr.size,
         blocks: attr.blocks,
@@ -108,13 +108,13 @@ fn fuse_attr_from_attr(attr: &FileAttr) -> fuse_attr {
 
 /// Returns a fuse_attr from FileAttr
 #[cfg(not(target_os = "macos"))]
-fn fuse_attr_from_attr(attr: &FileAttr) -> fuse_attr {
+fn fuse_attr_from_attr(attr: &FileAttr) -> FuseAttr {
     // FIXME: unwrap may panic, use unwrap_or((0, 0)) or return a result instead?
     let (atime_secs, atime_nanos) = time_from_system_time(&attr.atime).unwrap();
     let (mtime_secs, mtime_nanos) = time_from_system_time(&attr.mtime).unwrap();
     let (ctime_secs, ctime_nanos) = time_from_system_time(&attr.ctime).unwrap();
 
-    fuse_attr {
+    FuseAttr {
         ino: attr.ino,
         size: attr.size,
         blocks: attr.blocks,
@@ -163,8 +163,8 @@ impl<T> ReplyRaw<T> {
     fn send(&mut self, err: c_int, bytes: &[&[u8]]) {
         assert!(self.sender.is_some());
         let len = bytes.iter().fold(0, |l, b| l + b.len());
-        let header = fuse_out_header {
-            len: (mem::size_of::<fuse_out_header>() + len) as u32,
+        let header = FuseOutHeader {
+            len: (mem::size_of::<FuseOutHeader>() + len) as u32,
             error: -err,
             unique: self.unique,
         };
@@ -262,7 +262,7 @@ impl ReplyData {
 ///
 #[derive(Debug)]
 pub struct ReplyEntry {
-    reply: ReplyRaw<fuse_entry_out>,
+    reply: ReplyRaw<FuseEntryOut>,
 }
 
 impl Reply for ReplyEntry {
@@ -276,7 +276,7 @@ impl Reply for ReplyEntry {
 impl ReplyEntry {
     /// Reply to a request with the given entry
     pub fn entry(self, ttl: &Duration, attr: &FileAttr, generation: u64) {
-        self.reply.ok(&fuse_entry_out {
+        self.reply.ok(&FuseEntryOut {
             nodeid: attr.ino,
             generation,
             entry_valid: ttl.as_secs(),
@@ -298,7 +298,7 @@ impl ReplyEntry {
 ///
 #[derive(Debug)]
 pub struct ReplyAttr {
-    reply: ReplyRaw<fuse_attr_out>,
+    reply: ReplyRaw<FuseAttrOut>,
 }
 
 impl Reply for ReplyAttr {
@@ -312,7 +312,7 @@ impl Reply for ReplyAttr {
 impl ReplyAttr {
     /// Reply to a request with the given attribute
     pub fn attr(self, ttl: &Duration, attr: &FileAttr) {
-        self.reply.ok(&fuse_attr_out {
+        self.reply.ok(&FuseAttrOut {
             attr_valid: ttl.as_secs(),
             attr_valid_nsec: ttl.subsec_nanos(),
             dummy: 0,
@@ -370,7 +370,7 @@ impl ReplyXTimes {
 ///
 #[derive(Debug)]
 pub struct ReplyOpen {
-    reply: ReplyRaw<fuse_open_out>,
+    reply: ReplyRaw<FuseOpenOut>,
 }
 
 impl Reply for ReplyOpen {
@@ -384,7 +384,7 @@ impl Reply for ReplyOpen {
 impl ReplyOpen {
     /// Reply to a request with the given open result
     pub fn opened(self, fh: u64, flags: u32) {
-        self.reply.ok(&fuse_open_out {
+        self.reply.ok(&FuseOpenOut {
             fh,
             open_flags: flags,
             padding: 0,
@@ -402,7 +402,7 @@ impl ReplyOpen {
 ///
 #[derive(Debug)]
 pub struct ReplyWrite {
-    reply: ReplyRaw<fuse_write_out>,
+    reply: ReplyRaw<FuseWriteOut>,
 }
 
 impl Reply for ReplyWrite {
@@ -416,7 +416,7 @@ impl Reply for ReplyWrite {
 impl ReplyWrite {
     /// Reply to a request with the given open result
     pub fn written(self, size: u32) {
-        self.reply.ok(&fuse_write_out { size, padding: 0 });
+        self.reply.ok(&FuseWriteOut { size, padding: 0 });
     }
 
     /// Reply to a request with the given error code
@@ -430,7 +430,7 @@ impl ReplyWrite {
 ///
 #[derive(Debug)]
 pub struct ReplyStatfs {
-    reply: ReplyRaw<fuse_statfs_out>,
+    reply: ReplyRaw<FuseStatfsOut>,
 }
 
 impl Reply for ReplyStatfs {
@@ -455,8 +455,8 @@ impl ReplyStatfs {
         namelen: u32,
         frsize: u32,
     ) {
-        self.reply.ok(&fuse_statfs_out {
-            st: fuse_kstatfs {
+        self.reply.ok(&FuseStatfsOut {
+            st: FuseKstatfs {
                 blocks,
                 bfree,
                 bavail,
@@ -482,7 +482,7 @@ impl ReplyStatfs {
 ///
 #[derive(Debug)]
 pub struct ReplyCreate {
-    reply: ReplyRaw<(fuse_entry_out, fuse_open_out)>,
+    reply: ReplyRaw<(FuseEntryOut, FuseOpenOut)>,
 }
 
 impl Reply for ReplyCreate {
@@ -497,7 +497,7 @@ impl ReplyCreate {
     /// Reply to a request with the given entry
     pub fn created(self, ttl: &Duration, attr: &FileAttr, generation: u64, fh: u64, flags: u32) {
         self.reply.ok(&(
-            fuse_entry_out {
+            FuseEntryOut {
                 nodeid: attr.ino,
                 generation,
                 entry_valid: ttl.as_secs(),
@@ -506,7 +506,7 @@ impl ReplyCreate {
                 attr_valid_nsec: ttl.subsec_nanos(),
                 attr: fuse_attr_from_attr(attr),
             },
-            fuse_open_out {
+            FuseOpenOut {
                 fh,
                 open_flags: flags,
                 padding: 0,
@@ -525,7 +525,7 @@ impl ReplyCreate {
 ///
 #[derive(Debug)]
 pub struct ReplyLock {
-    reply: ReplyRaw<fuse_lk_out>,
+    reply: ReplyRaw<FuseLkOut>,
 }
 
 impl Reply for ReplyLock {
@@ -539,8 +539,8 @@ impl Reply for ReplyLock {
 impl ReplyLock {
     /// Reply to a request with the given open result
     pub fn locked(self, start: u64, end: u64, typ: u32, pid: u32) {
-        self.reply.ok(&fuse_lk_out {
-            lk: fuse_file_lock {
+        self.reply.ok(&FuseLkOut {
+            lk: FuseFileLock {
                 start,
                 end,
                 typ,
@@ -560,7 +560,7 @@ impl ReplyLock {
 ///
 #[derive(Debug)]
 pub struct ReplyBmap {
-    reply: ReplyRaw<fuse_bmap_out>,
+    reply: ReplyRaw<FuseBmapOut>,
 }
 
 impl Reply for ReplyBmap {
@@ -574,7 +574,7 @@ impl Reply for ReplyBmap {
 impl ReplyBmap {
     /// Reply to a request with the given open result
     pub fn bmap(self, block: u64) {
-        self.reply.ok(&fuse_bmap_out { block });
+        self.reply.ok(&FuseBmapOut { block });
     }
 
     /// Reply to a request with the given error code
@@ -606,7 +606,7 @@ impl ReplyDirectory {
     /// value to request the next entries in further readdir calls
     pub fn add<T: AsRef<OsStr>>(&mut self, ino: u64, offset: i64, kind: FileType, name: T) -> bool {
         let name = name.as_ref().as_bytes();
-        let entlen = mem::size_of::<fuse_dirent>() + name.len();
+        let entlen = mem::size_of::<FuseDirent>() + name.len();
         let entsize = (entlen + mem::size_of::<u64>() - 1) & !(mem::size_of::<u64>() - 1); // 64bit align
         let padlen = entsize - entlen;
         if self.data.len() + entsize > self.data.capacity() {
@@ -614,7 +614,7 @@ impl ReplyDirectory {
         }
         unsafe {
             let p = self.data.as_mut_ptr().add(self.data.len());
-            let pdirent: *mut fuse_dirent = mem::transmute(p);
+            let pdirent: *mut FuseDirent = mem::transmute(p);
             (*pdirent).ino = ino;
             (*pdirent).off = offset as u64;
             (*pdirent).namelen = name.len() as u32;
@@ -645,7 +645,7 @@ impl ReplyDirectory {
 ///
 #[derive(Debug)]
 pub struct ReplyXattr {
-    reply: ReplyRaw<fuse_getxattr_out>,
+    reply: ReplyRaw<FuseGetxattrOut>,
 }
 
 impl Reply for ReplyXattr {
@@ -659,7 +659,7 @@ impl Reply for ReplyXattr {
 impl ReplyXattr {
     /// Reply to a request with the size of the xattr.
     pub fn size(self, size: u32) {
-        self.reply.ok(&fuse_getxattr_out { size, padding: 0 });
+        self.reply.ok(&FuseGetxattrOut { size, padding: 0 });
     }
 
     /// Reply to a request with the data in the xattr.

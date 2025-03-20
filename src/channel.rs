@@ -2,7 +2,7 @@
 //!
 //! Raw communication channel to the FUSE kernel driver.
 
-use fuse_sys::{fuse_args, fuse_mount_compat25};
+use fuse_sys::{FuseArgs, fuse_mount_compat25};
 use libc::{self, c_int, c_void, size_t};
 use log::error;
 use std::ffi::{CStr, CString, OsStr};
@@ -14,11 +14,11 @@ use crate::reply::ReplySender;
 
 /// Helper function to provide options as a fuse_args struct
 /// (which contains an argc count and an argv pointer)
-fn with_fuse_args<T, F: FnOnce(&fuse_args) -> T>(options: &[&OsStr], f: F) -> T {
+fn with_fuse_args<T, F: FnOnce(&FuseArgs) -> T>(options: &[&OsStr], f: F) -> T {
     let mut args = vec![CString::new("fuse-rs").unwrap()];
     args.extend(options.iter().map(|s| CString::new(s.as_bytes()).unwrap()));
     let argptrs: Vec<_> = args.iter().map(|s| s.as_ptr()).collect();
-    f(&fuse_args {
+    f(&FuseArgs {
         argc: argptrs.len() as i32,
         argv: argptrs.as_ptr(),
         allocated: 0,

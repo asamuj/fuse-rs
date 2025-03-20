@@ -30,7 +30,7 @@ impl fmt::Display for RequestError {
                 f,
                 "Short read of FUSE request header ({} < {})",
                 len,
-                mem::size_of::<fuse_in_header>()
+                mem::size_of::<FuseInHeader>()
             ),
             RequestError::UnknownOperation(opcode) => write!(f, "Unknown FUSE opcode ({})", opcode),
             RequestError::ShortRead(len, total) => {
@@ -51,11 +51,11 @@ pub enum Operation<'a> {
         name: &'a OsStr,
     },
     Forget {
-        arg: &'a fuse_forget_in,
+        arg: &'a FuseForgetIn,
     },
     GetAttr,
     SetAttr {
-        arg: &'a fuse_setattr_in,
+        arg: &'a FuseSetattrIn,
     },
     ReadLink,
     SymLink {
@@ -63,11 +63,11 @@ pub enum Operation<'a> {
         link: &'a OsStr,
     },
     MkNod {
-        arg: &'a fuse_mknod_in,
+        arg: &'a FuseMknodIn,
         name: &'a OsStr,
     },
     MkDir {
-        arg: &'a fuse_mkdir_in,
+        arg: &'a FuseMkdirIn,
         name: &'a OsStr,
     },
     Unlink {
@@ -77,85 +77,85 @@ pub enum Operation<'a> {
         name: &'a OsStr,
     },
     Rename {
-        arg: &'a fuse_rename_in,
+        arg: &'a FuseRenameIn,
         name: &'a OsStr,
         newname: &'a OsStr,
     },
     Link {
-        arg: &'a fuse_link_in,
+        arg: &'a FuseLinkIn,
         name: &'a OsStr,
     },
     Open {
-        arg: &'a fuse_open_in,
+        arg: &'a FuseOpenIn,
     },
     Read {
-        arg: &'a fuse_read_in,
+        arg: &'a FuseReadIn,
     },
     Write {
-        arg: &'a fuse_write_in,
+        arg: &'a FuseWriteIn,
         data: &'a [u8],
     },
     StatFs,
     Release {
-        arg: &'a fuse_release_in,
+        arg: &'a FuseReleaseIn,
     },
     FSync {
-        arg: &'a fuse_fsync_in,
+        arg: &'a FuseFsyncIn,
     },
     SetXAttr {
-        arg: &'a fuse_setxattr_in,
+        arg: &'a FuseSetxattrIn,
         name: &'a OsStr,
         value: &'a [u8],
     },
     GetXAttr {
-        arg: &'a fuse_getxattr_in,
+        arg: &'a FuseGetxattrIn,
         name: &'a OsStr,
     },
     ListXAttr {
-        arg: &'a fuse_getxattr_in,
+        arg: &'a FuseGetxattrIn,
     },
     RemoveXAttr {
         name: &'a OsStr,
     },
     Flush {
-        arg: &'a fuse_flush_in,
+        arg: &'a FuseFlushIn,
     },
     Init {
-        arg: &'a fuse_init_in,
+        arg: &'a FuseInitIn,
     },
     OpenDir {
-        arg: &'a fuse_open_in,
+        arg: &'a FuseOpenIn,
     },
     ReadDir {
-        arg: &'a fuse_read_in,
+        arg: &'a FuseReadIn,
     },
     ReleaseDir {
-        arg: &'a fuse_release_in,
+        arg: &'a FuseReleaseIn,
     },
     FSyncDir {
-        arg: &'a fuse_fsync_in,
+        arg: &'a FuseFsyncIn,
     },
     GetLk {
-        arg: &'a fuse_lk_in,
+        arg: &'a FuseLkIn,
     },
     SetLk {
-        arg: &'a fuse_lk_in,
+        arg: &'a FuseLkIn,
     },
     SetLkW {
-        arg: &'a fuse_lk_in,
+        arg: &'a FuseLkIn,
     },
     Access {
-        arg: &'a fuse_access_in,
+        arg: &'a FuseAccessIn,
     },
     Create {
-        arg: &'a fuse_create_in,
+        arg: &'a FuseCreateIn,
         name: &'a OsStr,
     },
     Interrupt {
-        arg: &'a fuse_interrupt_in,
+        arg: &'a FuseInterruptIn,
     },
     BMap {
-        arg: &'a fuse_bmap_in,
+        arg: &'a FuseBmapIn,
     },
     Destroy,
     // TODO: FUSE_IOCTL since ABI 7.11
@@ -346,7 +346,7 @@ impl<'a> Operation<'a> {
 /// Low-level request of a filesystem operation the kernel driver wants to perform.
 #[derive(Debug)]
 pub struct Request<'a> {
-    header: &'a fuse_in_header,
+    header: &'a FuseInHeader,
     operation: Operation<'a>,
 }
 
@@ -369,7 +369,7 @@ impl<'a> TryFrom<&'a [u8]> for Request<'a> {
         let data_len = data.len();
         let mut data = ArgumentIterator::new(data);
         // Parse header
-        let header: &fuse_in_header =
+        let header: &FuseInHeader =
             unsafe { data.fetch() }.ok_or_else(|| RequestError::ShortReadHeader(data.len()))?;
         // Parse/check opcode
         let opcode = fuse_opcode::try_from(header.opcode)

@@ -63,7 +63,7 @@ impl<'a> Request<'a> {
         match self.request.operation() {
             // Filesystem initialization
             ll::Operation::Init { arg } => {
-                let reply: ReplyRaw<fuse_init_out> = self.reply();
+                let reply: ReplyRaw<FuseInitOut> = self.reply();
                 // We don't support ABI versions before 7.6
                 if arg.major < 7 || (arg.major == 7 && arg.minor < 6) {
                     error!("Unsupported FUSE ABI version {}.{}", arg.major, arg.minor);
@@ -82,7 +82,7 @@ impl<'a> Request<'a> {
                 // Reply with our desired version and settings. If the kernel supports a
                 // larger major version, it'll re-send a matching init message. If it
                 // supports only lower major versions, we replied with an error above.
-                let init = fuse_init_out {
+                let init = FuseInitOut {
                     major: FUSE_KERNEL_VERSION,
                     minor: FUSE_KERNEL_MINOR_VERSION,
                     max_readahead: arg.max_readahead, // accept any readahead size
@@ -163,7 +163,7 @@ impl<'a> Request<'a> {
                 #[cfg(target_os = "macos")]
                 #[inline]
                 fn get_macos_setattr(
-                    arg: &fuse_setattr_in,
+                    arg: &FuseSetattrIn,
                 ) -> (
                     Option<SystemTime>,
                     Option<SystemTime>,
@@ -191,7 +191,7 @@ impl<'a> Request<'a> {
                 #[cfg(not(target_os = "macos"))]
                 #[inline]
                 fn get_macos_setattr(
-                    _arg: &fuse_setattr_in,
+                    _arg: &FuseSetattrIn,
                 ) -> (
                     Option<SystemTime>,
                     Option<SystemTime>,
@@ -359,12 +359,12 @@ impl<'a> Request<'a> {
                 assert!(value.len() == arg.size as usize);
                 #[cfg(target_os = "macos")]
                 #[inline]
-                fn get_position(arg: &fuse_setxattr_in) -> u32 {
+                fn get_position(arg: &FuseSetxattrIn) -> u32 {
                     arg.position
                 }
                 #[cfg(not(target_os = "macos"))]
                 #[inline]
-                fn get_position(_arg: &fuse_setxattr_in) -> u32 {
+                fn get_position(_arg: &FuseSetxattrIn) -> u32 {
                     0
                 }
                 se.filesystem.setxattr(
