@@ -1,6 +1,6 @@
 [package]
 name = "fuse"
-edition = "2018"
+edition = "2021"
 version = "0.4.0-dev"
 authors = ["Andreas Neuhaus <zargony@zargony.com>"]
 description = "Rust library for filesystems in userspace (FUSE)"
@@ -27,4 +27,4 @@ log = "0.4.6"
 thread-scoped = "1.0.2"
 
 [dev-dependencies]
-env_logger = "0.6.0"
+env_logger = "0.11.7"
