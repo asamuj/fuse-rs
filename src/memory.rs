@@ -25,7 +25,6 @@ impl Filesystem for MemoryFS {
         let root_file = FileAttr {
             ino: 1,
             kind: FileType::Directory,
-            perm: 0o755,
             ..Default::default()
         };
 
@@ -34,7 +33,6 @@ impl Filesystem for MemoryFS {
         let parent_file = FileAttr {
             ino: 2,
             kind: FileType::Directory,
-            perm: 0o755,
             ..Default::default()
         };
 

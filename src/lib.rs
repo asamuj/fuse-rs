@@ -89,7 +89,7 @@ impl Default for FileAttr {
             ctime: SystemTime::now(),
             crtime: SystemTime::now(),
             kind: FileType::RegularFile,
-            perm: Default::default(),
+            perm: 0o755,
             nlink: 1,
             uid: Default::default(),
             gid: Default::default(),
