@@ -55,8 +55,19 @@ impl Channel {
         &self.mountpoint
     }
 
-    /// Receives data up to the capacity of the given buffer (can block).
+    /// Receives data up to the capacity of the given buffer without blocking.
     pub async fn async_receive(&self, buffer: &mut Vec<u8>) -> io::Result<()> {
+        // Set the file descriptor to non-blocking mode
+        let flags = unsafe { libc::fcntl(self.fd, libc::F_GETFL) };
+        if flags < 0 {
+            return Err(io::Error::last_os_error());
+        }
+        let result = unsafe { libc::fcntl(self.fd, libc::F_SETFL, flags | libc::O_NONBLOCK) };
+        if result < 0 {
+            return Err(io::Error::last_os_error());
+        }
+
+        // Perform the read operation
         let rc = unsafe {
             libc::read(
                 self.fd,
@@ -64,6 +75,10 @@ impl Channel {
                 buffer.capacity() as size_t,
             )
         };
+
+        // Restore the original flags
+        unsafe { libc::fcntl(self.fd, libc::F_SETFL, flags) };
+
         if rc < 0 {
             Err(io::Error::last_os_error())
         } else {
