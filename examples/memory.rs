@@ -2,6 +2,7 @@ use std::env;
 use std::ffi::OsStr;
 
 use fuse::Session;
+use log::info;
 use tokio::signal;
 use tokio::sync::mpsc;
 
@@ -24,7 +25,7 @@ async fn main() {
 
     let ctrl_c = tokio::spawn(async move {
         signal::ctrl_c().await.expect("Failed to listen for Ctrl+C");
-        println!("\nReceived Ctrl+C, initiating shutdown...");
+        info!("Received Ctrl+C, initiating shutdown...");
         tx.send(()).await.unwrap();
     });
 

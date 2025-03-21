@@ -4,7 +4,7 @@
 
 use fuse_sys::{fuse_mount_compat25, FuseArgs};
 use libc::{self, c_int, c_void, size_t};
-use log::error;
+use log::{debug, error};
 use std::ffi::{CStr, CString, OsStr};
 use std::io;
 use std::os::unix::ffi::OsStrExt;
@@ -124,6 +124,7 @@ impl Drop for Channel {
         // TODO: send ioctl FUSEDEVIOCSETDAEMONDEAD on macOS before closing the fd
         // Close the communication channel to the kernel driver
         // (closing it before unnmount prevents sync unmount deadlock)
+        debug!("umount {}", self.mountpoint.display());
         unsafe {
             libc::close(self.fd);
         }
