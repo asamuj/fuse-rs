@@ -263,36 +263,20 @@ impl Filesystem for MemoryFS {
         flags: Option<u32>,
         reply: crate::ReplyAttr,
     ) {
-        if let Some((_, file_attr)) = self.inodes.get_mut(&ino) {
-            if let Some(mode) = mode {
-                file_attr.perm = mode as u16;
-            }
-            if let Some(uid) = uid {
-                file_attr.uid = uid;
-            }
-            if let Some(gid) = gid {
-                file_attr.gid = gid;
-            }
-            if let Some(size) = size {
-                file_attr.size = size;
-            }
-            if let Some(atime) = atime {
-                file_attr.atime = atime;
-            }
-            if let Some(mtime) = mtime {
-                file_attr.mtime = mtime;
-            }
-            if let Some(crtime) = crtime {
-                file_attr.crtime = crtime;
-            }
-
-            if let Some(flags) = flags {
-                file_attr.flags = flags;
-            }
-            reply.attr(&Duration::new(1, 0), file_attr);
-        } else {
+        let Some((_, file_attr)) = self.inodes.get_mut(&ino) else {
             reply.error(ENOENT);
-        }
+            return;
+        };
+
+        mode.map(|mode| file_attr.perm = mode as u16);
+        uid.map(|uid| file_attr.uid = uid);
+        gid.map(|gid| file_attr.gid = gid);
+        size.map(|size| file_attr.size = size);
+        atime.map(|atime| file_attr.atime = atime);
+        mtime.map(|mtime| file_attr.mtime = mtime);
+        crtime.map(|crtime| file_attr.crtime = crtime);
+        flags.map(|flags| file_attr.flags = flags);
+        reply.attr(&Duration::new(1, 0), file_attr);
     }
 
     fn write(
