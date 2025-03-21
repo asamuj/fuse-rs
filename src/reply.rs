@@ -6,21 +6,20 @@
 //! data without cloning the data. A reply *must always* be used (by calling either ok() or
 //! error() exactly once).
 
-use fuse_abi::FuseGetxattrOut;
 #[cfg(target_os = "macos")]
 use fuse_abi::fuse_getxtimes_out;
-use fuse_abi::{FuseAttr, FuseAttrOut, FuseEntryOut, FuseFileLock, FuseKstatfs};
-use fuse_abi::{FuseBmapOut, FuseLkOut, FuseOpenOut, FuseStatfsOut, FuseWriteOut};
-use fuse_abi::{FuseDirent, FuseOutHeader};
+use fuse_abi::{
+    FuseAttr, FuseAttrOut, FuseBmapOut, FuseDirent, FuseEntryOut, FuseFileLock, FuseGetxattrOut,
+    FuseKstatfs, FuseLkOut, FuseOpenOut, FuseOutHeader, FuseStatfsOut, FuseWriteOut,
+};
 use libc::{c_int, EIO, S_IFBLK, S_IFCHR, S_IFDIR, S_IFIFO, S_IFLNK, S_IFREG, S_IFSOCK};
 use log::warn;
 use std::convert::AsRef;
 use std::ffi::OsStr;
-use std::fmt;
 use std::marker::PhantomData;
 use std::os::unix::ffi::OsStrExt;
 use std::time::{Duration, SystemTime, SystemTimeError, UNIX_EPOCH};
-use std::{mem, ptr, slice};
+use std::{fmt, mem, ptr, slice};
 
 use crate::{FileAttr, FileType};
 
@@ -675,12 +674,12 @@ impl ReplyXattr {
 
 #[cfg(test)]
 mod test {
-    use super::as_bytes;
     #[cfg(target_os = "macos")]
     use super::ReplyXTimes;
-    use super::ReplyXattr;
-    use super::{Reply, ReplyAttr, ReplyData, ReplyEmpty, ReplyEntry, ReplyOpen, ReplyRaw};
-    use super::{ReplyBmap, ReplyCreate, ReplyDirectory, ReplyLock, ReplyStatfs, ReplyWrite};
+    use super::{
+        as_bytes, Reply, ReplyAttr, ReplyBmap, ReplyCreate, ReplyData, ReplyDirectory, ReplyEmpty,
+        ReplyEntry, ReplyLock, ReplyOpen, ReplyRaw, ReplyStatfs, ReplyWrite, ReplyXattr,
+    };
     use crate::{FileAttr, FileType};
     use std::sync::mpsc::{channel, Sender};
     use std::thread;

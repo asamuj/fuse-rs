@@ -2,7 +2,7 @@
 //!
 //! Raw communication channel to the FUSE kernel driver.
 
-use fuse_sys::{FuseArgs, fuse_mount_compat25};
+use fuse_sys::{fuse_mount_compat25, FuseArgs};
 use libc::{self, c_int, c_void, size_t};
 use log::error;
 use std::ffi::{CStr, CString, OsStr};
@@ -56,6 +56,24 @@ impl Channel {
     }
 
     /// Receives data up to the capacity of the given buffer (can block).
+    pub async fn async_receive(&self, buffer: &mut Vec<u8>) -> io::Result<()> {
+        let rc = unsafe {
+            libc::read(
+                self.fd,
+                buffer.as_ptr() as *mut c_void,
+                buffer.capacity() as size_t,
+            )
+        };
+        if rc < 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            unsafe {
+                buffer.set_len(rc as usize);
+            }
+            Ok(())
+        }
+    }
+
     pub fn receive(&self, buffer: &mut Vec<u8>) -> io::Result<()> {
         let rc = unsafe {
             libc::read(
@@ -190,7 +208,6 @@ pub fn unmount(mountpoint: &Path) -> io::Result<()> {
 mod test {
     use super::with_fuse_args;
     use std::ffi::{CStr, OsStr};
-
     #[test]
     fn fuse_args() {
         with_fuse_args(&[OsStr::new("foo"), OsStr::new("bar")], |args| {

@@ -6,14 +6,13 @@
 //! for filesystem operations under its mount point.
 
 use libc::{EAGAIN, EINTR, ENODEV, ENOENT};
-use log::{error, info};
+use log::info;
 use std::ffi::OsStr;
-use std::fmt;
 use std::io;
-use std::path::{Path, PathBuf};
-use thread_scoped::{scoped, JoinGuard};
+use std::path::Path;
+use tokio::sync::mpsc;
 
-use crate::channel::{self, Channel};
+use crate::channel::Channel;
 use crate::request::Request;
 use crate::Filesystem;
 
@@ -47,7 +46,9 @@ impl<FS: Filesystem> Session<FS> {
     /// Create a new session by mounting the given filesystem to the given mountpoint
     pub fn new(filesystem: FS, mountpoint: &Path, options: &[&OsStr]) -> io::Result<Session<FS>> {
         info!("Mounting {}", mountpoint.display());
-        Channel::new(mountpoint, options).map(|ch| Session {
+
+        let ch = Channel::new(mountpoint, options)?;
+        Ok(Session {
             filesystem,
             ch,
             proto_major: 0,
@@ -96,67 +97,47 @@ impl<FS: Filesystem> Session<FS> {
         }
         Ok(())
     }
-}
 
-impl<'a, FS: Filesystem + Send + 'a> Session<FS> {
-    /// Run the session loop in a background thread
-    #[allow(clippy::missing_safety_doc)]
-    pub unsafe fn spawn(self) -> io::Result<BackgroundSession<'a>> {
-        BackgroundSession::new(self)
+    pub async fn run_with_signal(&mut self, mut rx: mpsc::Receiver<()>) -> io::Result<()> {
+        // Buffer for receiving requests from the kernel. Only one is allocated and
+        // it is reused immediately after dispatching to conserve memory and allocations.
+        let mut buffer: Vec<u8> = Vec::with_capacity(BUFFER_SIZE);
+        loop {
+            tokio::select! {
+                    _ = rx.recv() => {
+                        // Received signal to exit
+                        break;
+                    },
+                receive_result =  self.ch.async_receive(&mut buffer) => {
+                    match receive_result {
+                        Ok(()) => match Request::new(self.ch.sender(), &buffer) {
+                            // Dispatch request
+                            Some(req) => req.dispatch(self),
+                            // Quit loop on illegal request
+                            None => break,
+                        },
+                        Err(err) => match err.raw_os_error() {
+                            // Operation interrupted. According to FUSE, this is safe to retry
+                            Some(ENOENT) => continue,
+                            // Interrupted system call, retry
+                            Some(EINTR) => continue,
+                            // Explicitly try again
+                            Some(EAGAIN) => continue,
+                            // Filesystem was unmounted, quit the loop
+                            Some(ENODEV) => break,
+                            // Unhandled error
+                            _ => return Err(err),
+                        },
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 
 impl<FS: Filesystem> Drop for Session<FS> {
     fn drop(&mut self) {
         info!("Unmounted {}", self.mountpoint().display());
-    }
-}
-
-/// The background session data structure
-pub struct BackgroundSession<'a> {
-    /// Path of the mounted filesystem
-    pub mountpoint: PathBuf,
-    /// Thread guard of the background session
-    pub guard: JoinGuard<'a, io::Result<()>>,
-}
-
-impl<'a> BackgroundSession<'a> {
-    /// Create a new background session for the given session by running its
-    /// session loop in a background thread. If the returned handle is dropped,
-    /// the filesystem is unmounted and the given session ends.
-    #[allow(clippy::missing_safety_doc)]
-    pub unsafe fn new<FS: Filesystem + Send + 'a>(
-        se: Session<FS>,
-    ) -> io::Result<BackgroundSession<'a>> {
-        let mountpoint = se.mountpoint().to_path_buf();
-        let guard = scoped(move || {
-            let mut se = se;
-            se.run()
-        });
-        Ok(BackgroundSession { mountpoint, guard })
-    }
-}
-
-impl Drop for BackgroundSession<'_> {
-    fn drop(&mut self) {
-        info!("Unmounting {}", self.mountpoint.display());
-        // Unmounting the filesystem will eventually end the session loop,
-        // drop the session and hence end the background thread.
-        match channel::unmount(&self.mountpoint) {
-            Ok(()) => (),
-            Err(err) => error!("Failed to unmount {}: {}", self.mountpoint.display(), err),
-        }
-    }
-}
-
-// replace with #[derive(Debug)] if Debug ever gets implemented for
-// thread_scoped::JoinGuard
-impl fmt::Debug for BackgroundSession<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(
-            f,
-            "BackgroundSession {{ mountpoint: {:?}, guard: JoinGuard<()> }}",
-            self.mountpoint
-        )
     }
 }

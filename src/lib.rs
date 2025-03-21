@@ -4,27 +4,24 @@
 //! advantage of Rust's architecture. The only thing we rely on in the real libfuse are mount
 //! and unmount calls which are needed to establish a fd to talk to the kernel driver.
 
-#![warn(missing_docs, missing_debug_implementations, rust_2018_idioms)]
-
 use libc::{c_int, ENOSYS};
-use std::convert::AsRef;
 use std::ffi::OsStr;
-use std::io;
 use std::path::Path;
 use std::time::SystemTime;
 
-pub use fuse_abi::consts;
-pub use fuse_abi::FUSE_ROOT_ID;
+pub use fuse_abi::{consts, FUSE_ROOT_ID};
 #[cfg(target_os = "macos")]
 pub use reply::ReplyXTimes;
-pub use reply::ReplyXattr;
-pub use reply::{Reply, ReplyAttr, ReplyData, ReplyEmpty, ReplyEntry, ReplyOpen};
-pub use reply::{ReplyBmap, ReplyCreate, ReplyDirectory, ReplyLock, ReplyStatfs, ReplyWrite};
+pub use reply::{
+    Reply, ReplyAttr, ReplyBmap, ReplyCreate, ReplyData, ReplyDirectory, ReplyEmpty, ReplyEntry,
+    ReplyLock, ReplyOpen, ReplyStatfs, ReplyWrite, ReplyXattr,
+};
 pub use request::Request;
-pub use session::{BackgroundSession, Session};
+pub use session::Session;
 
 mod channel;
 mod ll;
+pub mod memory;
 mod reply;
 mod request;
 mod session;
@@ -79,6 +76,27 @@ pub struct FileAttr {
     pub rdev: u32,
     /// Flags (macOS only, see chflags(2))
     pub flags: u32,
+}
+
+impl Default for FileAttr {
+    fn default() -> Self {
+        Self {
+            ino: Default::default(),
+            size: Default::default(),
+            blocks: Default::default(),
+            atime: SystemTime::now(),
+            mtime: SystemTime::now(),
+            ctime: SystemTime::now(),
+            crtime: SystemTime::now(),
+            kind: FileType::RegularFile,
+            perm: Default::default(),
+            nlink: 1,
+            uid: Default::default(),
+            gid: Default::default(),
+            rdev: Default::default(),
+            flags: Default::default(),
+        }
+    }
 }
 
 /// Filesystem trait.
@@ -545,29 +563,28 @@ pub trait Filesystem {
     }
 }
 
-/// Mount the given filesystem to the given mountpoint. This function will
-/// not return until the filesystem is unmounted.
-///
-/// Note that you need to lead each option with a separate `"-o"` string. See
-/// `examples/hello.rs`.
-pub fn mount<FS: Filesystem, P: AsRef<Path>>(
-    filesystem: FS,
-    mountpoint: P,
-    options: &[&OsStr],
-) -> io::Result<()> {
-    Session::new(filesystem, mountpoint.as_ref(), options).and_then(|mut se| se.run())
-}
+// /// Mount the given filesystem to the given mountpoint. This function will
+// /// not return until the filesystem is unmounted.
+// ///
+// /// Note that you need to lead each option with a separate `"-o"` string. See
+// /// `examples/hello.rs`.
+// pub fn mount<FS: Filesystem, P: AsRef<Path>>(
+//     filesystem: FS,
+//     mountpoint: P,
+//     options: &[&OsStr],
+// ) -> io::Result<()> {
+//     Session::new(filesystem, mountpoint.as_ref(), options).and_then(|mut se| se.run())
+// }
 
-/// Mount the given filesystem to the given mountpoint. This function spawns
-/// a background thread to handle filesystem operations while being mounted
-/// and therefore returns immediately. The returned handle should be stored
-/// to reference the mounted filesystem. If it's dropped, the filesystem will
-/// be unmounted.
-#[allow(clippy::missing_safety_doc)]
-pub unsafe fn spawn_mount<'a, FS: Filesystem + Send + 'a, P: AsRef<Path>>(
-    filesystem: FS,
-    mountpoint: P,
-    options: &[&OsStr],
-) -> io::Result<BackgroundSession<'a>> {
-    Session::new(filesystem, mountpoint.as_ref(), options).and_then(|se| se.spawn())
-}
+// /// Mount the given filesystem to the given mountpoint. This function spawns
+// /// a background thread to handle filesystem operations while being mounted
+// /// and therefore returns immediately. The returned handle should be stored
+// /// to reference the mounted filesystem. If it's dropped, the filesystem will
+// /// be unmounted.
+// pub fn spawn_mount<'a, FS: Filesystem + Send + 'static, P: AsRef<Path>>(
+//     filesystem: FS,
+//     mountpoint: P,
+//     options: &[&OsStr],
+// ) -> io::Result<BackgroundSession> {
+//     Session::new(filesystem, mountpoint.as_ref(), options).and_then(|se| se.spawn())
+// }

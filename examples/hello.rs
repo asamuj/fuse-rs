@@ -1,5 +1,6 @@
 use fuse::{
     FileAttr, FileType, Filesystem, ReplyAttr, ReplyData, ReplyDirectory, ReplyEntry, Request,
+    Session,
 };
 use libc::ENOENT;
 use std::env;
@@ -113,5 +114,9 @@ fn main() {
         .iter()
         .map(|o| o.as_ref())
         .collect::<Vec<&OsStr>>();
-    fuse::mount(HelloFS, mountpoint, &options).unwrap();
+
+    Session::new(HelloFS {}, mountpoint.as_ref(), &options)
+        .unwrap()
+        .run()
+        .unwrap();
 }
