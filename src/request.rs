@@ -73,7 +73,7 @@ impl<'a> Request<'a> {
                 se.proto_major = arg.major;
                 se.proto_minor = arg.minor;
                 // Call filesystem init method and give it a chance to return an error
-                let res = se.filesystem.init(self);
+                let res = se.filesystem.init();
                 if let Err(err) = res {
                     reply.error(err);
                     return;
@@ -103,7 +103,7 @@ impl<'a> Request<'a> {
             }
             // Filesystem destroyed
             ll::Operation::Destroy => {
-                se.filesystem.destroy(self);
+                se.filesystem.destroy();
                 se.destroyed = true;
                 self.reply::<ReplyEmpty>().ok();
             }
@@ -120,15 +120,13 @@ impl<'a> Request<'a> {
 
             ll::Operation::Lookup { name } => {
                 se.filesystem
-                    .lookup(self, self.request.nodeid(), name, self.reply());
+                    .lookup(self.request.nodeid(), name, self.reply());
             }
             ll::Operation::Forget { arg } => {
-                se.filesystem
-                    .forget(self, self.request.nodeid(), arg.nlookup); // no reply
+                se.filesystem.forget(self.request.nodeid(), arg.nlookup); // no reply
             }
             ll::Operation::GetAttr => {
-                se.filesystem
-                    .getattr(self, self.request.nodeid(), self.reply());
+                se.filesystem.getattr(self.request.nodeid(), self.reply());
             }
             ll::Operation::SetAttr { arg } => {
                 let mode = match arg.valid & FATTR_MODE {
@@ -201,7 +199,6 @@ impl<'a> Request<'a> {
                 }
                 let (crtime, chgtime, bkuptime, flags) = get_macos_setattr(arg);
                 se.filesystem.setattr(
-                    self,
                     self.request.nodeid(),
                     mode,
                     uid,
@@ -218,12 +215,10 @@ impl<'a> Request<'a> {
                 );
             }
             ll::Operation::ReadLink => {
-                se.filesystem
-                    .readlink(self, self.request.nodeid(), self.reply());
+                se.filesystem.readlink(self.request.nodeid(), self.reply());
             }
             ll::Operation::MkNod { arg, name } => {
                 se.filesystem.mknod(
-                    self,
                     self.request.nodeid(),
                     name,
                     arg.mode,
@@ -233,28 +228,22 @@ impl<'a> Request<'a> {
             }
             ll::Operation::MkDir { arg, name } => {
                 se.filesystem
-                    .mkdir(self, self.request.nodeid(), name, arg.mode, self.reply());
+                    .mkdir(self.request.nodeid(), name, arg.mode, self.reply());
             }
             ll::Operation::Unlink { name } => {
                 se.filesystem
-                    .unlink(self, self.request.nodeid(), name, self.reply());
+                    .unlink(self.request.nodeid(), name, self.reply());
             }
             ll::Operation::RmDir { name } => {
                 se.filesystem
-                    .rmdir(self, self.request.nodeid(), name, self.reply());
+                    .rmdir(self.request.nodeid(), name, self.reply());
             }
             ll::Operation::SymLink { name, link } => {
-                se.filesystem.symlink(
-                    self,
-                    self.request.nodeid(),
-                    name,
-                    Path::new(link),
-                    self.reply(),
-                );
+                se.filesystem
+                    .symlink(self.request.nodeid(), name, Path::new(link), self.reply());
             }
             ll::Operation::Rename { arg, name, newname } => {
                 se.filesystem.rename(
-                    self,
                     self.request.nodeid(),
                     name,
                     arg.newdir,
@@ -263,21 +252,15 @@ impl<'a> Request<'a> {
                 );
             }
             ll::Operation::Link { arg, name } => {
-                se.filesystem.link(
-                    self,
-                    arg.oldnodeid,
-                    self.request.nodeid(),
-                    name,
-                    self.reply(),
-                );
+                se.filesystem
+                    .link(arg.oldnodeid, self.request.nodeid(), name, self.reply());
             }
             ll::Operation::Open { arg } => {
                 se.filesystem
-                    .open(self, self.request.nodeid(), arg.flags, self.reply());
+                    .open(self.request.nodeid(), arg.flags, self.reply());
             }
             ll::Operation::Read { arg } => {
                 se.filesystem.read(
-                    self,
                     self.request.nodeid(),
                     arg.fh,
                     arg.offset as i64,
@@ -288,7 +271,6 @@ impl<'a> Request<'a> {
             ll::Operation::Write { arg, data } => {
                 assert!(data.len() == arg.size as usize);
                 se.filesystem.write(
-                    self,
                     self.request.nodeid(),
                     arg.fh,
                     arg.offset as i64,
@@ -298,18 +280,12 @@ impl<'a> Request<'a> {
                 );
             }
             ll::Operation::Flush { arg } => {
-                se.filesystem.flush(
-                    self,
-                    self.request.nodeid(),
-                    arg.fh,
-                    arg.lock_owner,
-                    self.reply(),
-                );
+                se.filesystem
+                    .flush(self.request.nodeid(), arg.fh, arg.lock_owner, self.reply());
             }
             ll::Operation::Release { arg } => {
                 let flush = !matches!(arg.release_flags & FUSE_RELEASE_FLUSH, 0);
                 se.filesystem.release(
-                    self,
                     self.request.nodeid(),
                     arg.fh,
                     arg.flags,
@@ -321,15 +297,14 @@ impl<'a> Request<'a> {
             ll::Operation::FSync { arg } => {
                 let datasync = !matches!(arg.fsync_flags & 1, 0);
                 se.filesystem
-                    .fsync(self, self.request.nodeid(), arg.fh, datasync, self.reply());
+                    .fsync(self.request.nodeid(), arg.fh, datasync, self.reply());
             }
             ll::Operation::OpenDir { arg } => {
                 se.filesystem
-                    .opendir(self, self.request.nodeid(), arg.flags, self.reply());
+                    .opendir(self.request.nodeid(), arg.flags, self.reply());
             }
             ll::Operation::ReadDir { arg } => {
                 se.filesystem.readdir(
-                    self,
                     self.request.nodeid(),
                     arg.fh,
                     arg.offset as i64,
@@ -337,22 +312,16 @@ impl<'a> Request<'a> {
                 );
             }
             ll::Operation::ReleaseDir { arg } => {
-                se.filesystem.releasedir(
-                    self,
-                    self.request.nodeid(),
-                    arg.fh,
-                    arg.flags,
-                    self.reply(),
-                );
+                se.filesystem
+                    .releasedir(self.request.nodeid(), arg.fh, arg.flags, self.reply());
             }
             ll::Operation::FSyncDir { arg } => {
                 let datasync = !matches!(arg.fsync_flags & 1, 0);
                 se.filesystem
-                    .fsyncdir(self, self.request.nodeid(), arg.fh, datasync, self.reply());
+                    .fsyncdir(self.request.nodeid(), arg.fh, datasync, self.reply());
             }
             ll::Operation::StatFs => {
-                se.filesystem
-                    .statfs(self, self.request.nodeid(), self.reply());
+                se.filesystem.statfs(self.request.nodeid(), self.reply());
             }
             ll::Operation::SetXAttr { arg, name, value } => {
                 assert!(value.len() == arg.size as usize);
@@ -367,7 +336,6 @@ impl<'a> Request<'a> {
                     0
                 }
                 se.filesystem.setxattr(
-                    self,
                     self.request.nodeid(),
                     name,
                     value,
@@ -378,23 +346,22 @@ impl<'a> Request<'a> {
             }
             ll::Operation::GetXAttr { arg, name } => {
                 se.filesystem
-                    .getxattr(self, self.request.nodeid(), name, arg.size, self.reply());
+                    .getxattr(self.request.nodeid(), name, arg.size, self.reply());
             }
             ll::Operation::ListXAttr { arg } => {
                 se.filesystem
-                    .listxattr(self, self.request.nodeid(), arg.size, self.reply());
+                    .listxattr(self.request.nodeid(), arg.size, self.reply());
             }
             ll::Operation::RemoveXAttr { name } => {
                 se.filesystem
-                    .removexattr(self, self.request.nodeid(), name, self.reply());
+                    .removexattr(self.request.nodeid(), name, self.reply());
             }
             ll::Operation::Access { arg } => {
                 se.filesystem
-                    .access(self, self.request.nodeid(), arg.mask, self.reply());
+                    .access(self.request.nodeid(), arg.mask, self.reply());
             }
             ll::Operation::Create { arg, name } => {
                 se.filesystem.create(
-                    self,
                     self.request.nodeid(),
                     name,
                     arg.mode,
@@ -404,7 +371,6 @@ impl<'a> Request<'a> {
             }
             ll::Operation::GetLk { arg } => {
                 se.filesystem.getlk(
-                    self,
                     self.request.nodeid(),
                     arg.fh,
                     arg.owner,
@@ -417,7 +383,6 @@ impl<'a> Request<'a> {
             }
             ll::Operation::SetLk { arg } => {
                 se.filesystem.setlk(
-                    self,
                     self.request.nodeid(),
                     arg.fh,
                     arg.owner,
@@ -431,7 +396,6 @@ impl<'a> Request<'a> {
             }
             ll::Operation::SetLkW { arg } => {
                 se.filesystem.setlk(
-                    self,
                     self.request.nodeid(),
                     arg.fh,
                     arg.owner,
@@ -445,7 +409,6 @@ impl<'a> Request<'a> {
             }
             ll::Operation::BMap { arg } => {
                 se.filesystem.bmap(
-                    self,
                     self.request.nodeid(),
                     arg.blocksize,
                     arg.block,
@@ -455,12 +418,11 @@ impl<'a> Request<'a> {
 
             #[cfg(target_os = "macos")]
             ll::Operation::SetVolName { name } => {
-                se.filesystem.setvolname(self, name, self.reply());
+                se.filesystem.setvolname(name, self.reply());
             }
             #[cfg(target_os = "macos")]
             ll::Operation::GetXTimes => {
-                se.filesystem
-                    .getxtimes(self, self.request.nodeid(), self.reply());
+                se.filesystem.getxtimes(self.request.nodeid(), self.reply());
             }
             #[cfg(target_os = "macos")]
             ll::Operation::Exchange {
@@ -469,7 +431,6 @@ impl<'a> Request<'a> {
                 newname,
             } => {
                 se.filesystem.exchange(
-                    self,
                     arg.olddir,
                     &oldname,
                     arg.newdir,

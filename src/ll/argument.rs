@@ -6,6 +6,7 @@
 use std::ffi::OsStr;
 use std::mem;
 use std::os::unix::ffi::OsStrExt;
+use std::ptr::NonNull;
 
 /// An iterator that can be used to fetch typed arguments from a byte slice.
 pub struct ArgumentIterator<'a> {
@@ -35,27 +36,36 @@ impl<'a> ArgumentIterator<'a> {
         if amt > self.data.len() {
             return None;
         }
-        let bytes = &self.data[..amt];
-        self.data = &self.data[amt..];
+
+        let (bytes, remaining) = self.data.split_at(amt);
+        self.data = remaining;
         Some(bytes)
     }
 
     /// Fetch a typed argument. Returns `None` if there's not enough data left. This function is
     /// unsafe because there is no guarantee that the data actually contains the type T.
     pub unsafe fn fetch<T>(&mut self) -> Option<&'a T> {
-        let len = mem::size_of::<T>();
-        let bytes = self.fetch_bytes(len)?;
-        (bytes.as_ptr() as *const T).as_ref()
+        let size = mem::size_of::<T>();
+        if size == 0 {
+            return Some(NonNull::dangling().as_ref());
+        }
+
+        let bytes = self.fetch_bytes(size)?;
+        if bytes.as_ptr().align_offset(mem::align_of::<T>()) != 0 {
+            return None;
+        }
+        Some(&*(bytes.as_ptr() as *const T))
     }
 
     /// Fetch a (zero-terminated) string (can be non-utf8). Returns `None` if there's not enough
     /// data left or no zero-termination could be found. This function is unsafe because there is
     /// no guarantee that the data actually contains a string.
     pub unsafe fn fetch_str(&mut self) -> Option<&'a OsStr> {
-        let len = self.data.iter().position(|&c| c == 0)?;
-        let bytes = self.fetch_bytes(len)?;
-        let _zero = self.fetch_bytes(1)?;
-        Some(OsStr::from_bytes(bytes))
+        let pos = self.data.iter().position(|&c| c == 0)?;
+        let (bytes_with_zero, remaining) = self.data.split_at(pos + 1);
+        self.data = remaining;
+
+        Some(OsStr::from_bytes(&bytes_with_zero[..pos]))
     }
 }
 

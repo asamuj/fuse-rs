@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
-use crate::{FileAttr, FileType, Filesystem, Request};
+use crate::{FileAttr, FileType, Filesystem};
 use libc::{c_int, ENOENT};
 use log::debug;
 
@@ -21,7 +21,7 @@ pub struct MemoryFS {
 }
 
 impl Filesystem for MemoryFS {
-    fn init(&mut self, _req: &Request) -> Result<(), c_int> {
+    fn init(&mut self) -> Result<(), c_int> {
         let root_file = FileAttr {
             ino: 1,
             kind: FileType::Directory,
@@ -53,7 +53,7 @@ impl Filesystem for MemoryFS {
         pub namelen: u32, // Maximum filename length
         pub frsize: u32,  // Fundamental file system block size
     */
-    fn statfs(&mut self, _req: &Request<'_>, _ino: u64, reply: crate::ReplyStatfs) {
+    fn statfs(&mut self, _ino: u64, reply: crate::ReplyStatfs) {
         let blocks = self.max_size / FRSIZE as u64;
         let bfree = blocks;
         let bavail = blocks;
@@ -62,7 +62,7 @@ impl Filesystem for MemoryFS {
         reply.statfs(blocks, bfree, bavail, files, 1000, BLOCK_SIZE, 255, FRSIZE)
     }
 
-    fn getattr(&mut self, _req: &Request<'_>, ino: u64, reply: crate::ReplyAttr) {
+    fn getattr(&mut self, ino: u64, reply: crate::ReplyAttr) {
         if let Some((_, file_attr)) = self.inodes.get(&ino) {
             reply.attr(&Duration::new(1, 0), file_attr);
         } else {
@@ -70,18 +70,11 @@ impl Filesystem for MemoryFS {
         }
     }
 
-    fn opendir(&mut self, _req: &Request<'_>, _ino: u64, _flags: u32, reply: crate::ReplyOpen) {
+    fn opendir(&mut self, _ino: u64, _flags: u32, reply: crate::ReplyOpen) {
         reply.opened(0, 0);
     }
 
-    fn readdir(
-        &mut self,
-        _req: &Request<'_>,
-        ino: u64,
-        _fh: u64,
-        offset: i64,
-        mut reply: crate::ReplyDirectory,
-    ) {
+    fn readdir(&mut self, ino: u64, _fh: u64, offset: i64, mut reply: crate::ReplyDirectory) {
         if let Some(children) = self.parent_children.get(&ino) {
             for (i, ino) in children.iter().enumerate().skip(offset as usize) {
                 if let Some((name, file_attr)) = self.inodes.get(ino) {
@@ -96,24 +89,11 @@ impl Filesystem for MemoryFS {
         reply.ok();
     }
 
-    fn releasedir(
-        &mut self,
-        _req: &Request<'_>,
-        _ino: u64,
-        _fh: u64,
-        _flags: u32,
-        reply: crate::ReplyEmpty,
-    ) {
+    fn releasedir(&mut self, _ino: u64, _fh: u64, _flags: u32, reply: crate::ReplyEmpty) {
         reply.ok();
     }
 
-    fn rmdir(
-        &mut self,
-        _req: &Request<'_>,
-        parent: u64,
-        name: &std::ffi::OsStr,
-        reply: crate::ReplyEmpty,
-    ) {
+    fn rmdir(&mut self, parent: u64, name: &std::ffi::OsStr, reply: crate::ReplyEmpty) {
         if let Some(name_str) = name.to_str() {
             self.get_node_by_name(parent, name_str);
             self.inodes.remove(&parent);
@@ -129,13 +109,7 @@ impl Filesystem for MemoryFS {
         reply.error(ENOENT);
     }
 
-    fn lookup(
-        &mut self,
-        _req: &Request<'_>,
-        parent: u64,
-        name: &std::ffi::OsStr,
-        reply: crate::ReplyEntry,
-    ) {
+    fn lookup(&mut self, parent: u64, name: &std::ffi::OsStr, reply: crate::ReplyEntry) {
         match name
             .to_str()
             .and_then(|name_str| self.get_node_by_name(parent, name_str))
@@ -153,19 +127,11 @@ impl Filesystem for MemoryFS {
         }
     }
 
-    fn open(&mut self, _req: &Request<'_>, _ino: u64, _flags: u32, reply: crate::ReplyOpen) {
+    fn open(&mut self, _ino: u64, _flags: u32, reply: crate::ReplyOpen) {
         reply.opened(0, 0);
     }
 
-    fn read(
-        &mut self,
-        _req: &Request<'_>,
-        ino: u64,
-        _fh: u64,
-        offset: i64,
-        _size: u32,
-        reply: crate::ReplyData,
-    ) {
+    fn read(&mut self, ino: u64, _fh: u64, offset: i64, _size: u32, reply: crate::ReplyData) {
         if let Some(data) = self.data.get(&ino) {
             reply.data(&data[offset as usize..]);
         } else {
@@ -175,7 +141,7 @@ impl Filesystem for MemoryFS {
 
     fn release(
         &mut self,
-        _req: &Request<'_>,
+
         _ino: u64,
         _fh: u64,
         _flags: u32,
@@ -189,7 +155,7 @@ impl Filesystem for MemoryFS {
     // Create a new file
     fn create(
         &mut self,
-        _req: &Request<'_>,
+
         parent: u64,
         name: &std::ffi::OsStr,
         _mode: u32,
@@ -220,14 +186,7 @@ impl Filesystem for MemoryFS {
     }
 
     // create a directory
-    fn mkdir(
-        &mut self,
-        _req: &Request<'_>,
-        parent: u64,
-        name: &std::ffi::OsStr,
-        _mode: u32,
-        reply: crate::ReplyEntry,
-    ) {
+    fn mkdir(&mut self, parent: u64, name: &std::ffi::OsStr, _mode: u32, reply: crate::ReplyEntry) {
         let ino = self.inodes_num + 1;
         let file_attr = FileAttr {
             ino,
@@ -248,7 +207,7 @@ impl Filesystem for MemoryFS {
 
     fn setattr(
         &mut self,
-        _req: &Request<'_>,
+
         ino: u64,
         mode: Option<u32>,
         uid: Option<u32>,
@@ -281,7 +240,7 @@ impl Filesystem for MemoryFS {
 
     fn write(
         &mut self,
-        _req: &Request<'_>,
+
         ino: u64,
         _fh: u64,
         offset: i64,
@@ -315,13 +274,7 @@ impl Filesystem for MemoryFS {
         }
     }
 
-    fn unlink(
-        &mut self,
-        _req: &Request<'_>,
-        parent: u64,
-        name: &std::ffi::OsStr,
-        reply: crate::ReplyEmpty,
-    ) {
+    fn unlink(&mut self, parent: u64, name: &std::ffi::OsStr, reply: crate::ReplyEmpty) {
         match name
             .to_str()
             .and_then(|name_str| self.get_node_by_name(parent, name_str))
@@ -341,14 +294,7 @@ impl Filesystem for MemoryFS {
         }
     }
 
-    fn flush(
-        &mut self,
-        _req: &Request<'_>,
-        _ino: u64,
-        _fh: u64,
-        _lock_owner: u64,
-        reply: crate::ReplyEmpty,
-    ) {
+    fn flush(&mut self, _ino: u64, _fh: u64, _lock_owner: u64, reply: crate::ReplyEmpty) {
         reply.ok();
     }
 }

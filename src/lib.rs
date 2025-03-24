@@ -108,16 +108,16 @@ impl Default for FileAttr {
 pub trait Filesystem {
     /// Initialize filesystem.
     /// Called before any other filesystem method.
-    fn init(&mut self, _req: &Request<'_>) -> Result<(), c_int> {
+    fn init(&mut self) -> Result<(), c_int> {
         Ok(())
     }
 
     /// Clean up filesystem.
     /// Called on filesystem exit.
-    fn destroy(&mut self, _req: &Request<'_>) {}
+    fn destroy(&mut self) {}
 
     /// Look up a directory entry by name and get its attributes.
-    fn lookup(&mut self, _req: &Request<'_>, _parent: u64, _name: &OsStr, reply: ReplyEntry) {
+    fn lookup(&mut self, _parent: u64, _name: &OsStr, reply: ReplyEntry) {
         reply.error(ENOSYS);
     }
 
@@ -128,10 +128,10 @@ pub trait Filesystem {
     /// each forget. The filesystem may ignore forget calls, if the inodes don't need to
     /// have a limited lifetime. On unmount it is not guaranteed, that all referenced
     /// inodes will receive a forget message.
-    fn forget(&mut self, _req: &Request<'_>, _ino: u64, _nlookup: u64) {}
+    fn forget(&mut self, _ino: u64, _nlookup: u64) {}
 
     /// Get file attributes.
-    fn getattr(&mut self, _req: &Request<'_>, _ino: u64, reply: ReplyAttr) {
+    fn getattr(&mut self, _ino: u64, reply: ReplyAttr) {
         reply.error(ENOSYS);
     }
 
@@ -139,7 +139,6 @@ pub trait Filesystem {
     #[allow(clippy::too_many_arguments)]
     fn setattr(
         &mut self,
-        _req: &Request<'_>,
         _ino: u64,
         _mode: Option<u32>,
         _uid: Option<u32>,
@@ -158,62 +157,39 @@ pub trait Filesystem {
     }
 
     /// Read symbolic link.
-    fn readlink(&mut self, _req: &Request<'_>, _ino: u64, reply: ReplyData) {
+    fn readlink(&mut self, _ino: u64, reply: ReplyData) {
         reply.error(ENOSYS);
     }
 
     /// Create file node.
     /// Create a regular file, character device, block device, fifo or socket node.
-    fn mknod(
-        &mut self,
-        _req: &Request<'_>,
-        _parent: u64,
-        _name: &OsStr,
-        _mode: u32,
-        _rdev: u32,
-        reply: ReplyEntry,
-    ) {
+    fn mknod(&mut self, _parent: u64, _name: &OsStr, _mode: u32, _rdev: u32, reply: ReplyEntry) {
         reply.error(ENOSYS);
     }
 
     /// Create a directory.
-    fn mkdir(
-        &mut self,
-        _req: &Request<'_>,
-        _parent: u64,
-        _name: &OsStr,
-        _mode: u32,
-        reply: ReplyEntry,
-    ) {
+    fn mkdir(&mut self, _parent: u64, _name: &OsStr, _mode: u32, reply: ReplyEntry) {
         reply.error(ENOSYS);
     }
 
     /// Remove a file.
-    fn unlink(&mut self, _req: &Request<'_>, _parent: u64, _name: &OsStr, reply: ReplyEmpty) {
+    fn unlink(&mut self, _parent: u64, _name: &OsStr, reply: ReplyEmpty) {
         reply.error(ENOSYS);
     }
 
     /// Remove a directory.
-    fn rmdir(&mut self, _req: &Request<'_>, _parent: u64, _name: &OsStr, reply: ReplyEmpty) {
+    fn rmdir(&mut self, _parent: u64, _name: &OsStr, reply: ReplyEmpty) {
         reply.error(ENOSYS);
     }
 
     /// Create a symbolic link.
-    fn symlink(
-        &mut self,
-        _req: &Request<'_>,
-        _parent: u64,
-        _name: &OsStr,
-        _link: &Path,
-        reply: ReplyEntry,
-    ) {
+    fn symlink(&mut self, _parent: u64, _name: &OsStr, _link: &Path, reply: ReplyEntry) {
         reply.error(ENOSYS);
     }
 
     /// Rename a file.
     fn rename(
         &mut self,
-        _req: &Request<'_>,
         _parent: u64,
         _name: &OsStr,
         _newparent: u64,
@@ -224,14 +200,7 @@ pub trait Filesystem {
     }
 
     /// Create a hard link.
-    fn link(
-        &mut self,
-        _req: &Request<'_>,
-        _ino: u64,
-        _newparent: u64,
-        _newname: &OsStr,
-        reply: ReplyEntry,
-    ) {
+    fn link(&mut self, _ino: u64, _newparent: u64, _newname: &OsStr, reply: ReplyEntry) {
         reply.error(ENOSYS);
     }
 
@@ -243,7 +212,7 @@ pub trait Filesystem {
     /// anything in fh. There are also some flags (direct_io, keep_cache) which the
     /// filesystem may set, to change the way the file is opened. See fuse_file_info
     /// structure in <fuse_common.h> for more details.
-    fn open(&mut self, _req: &Request<'_>, _ino: u64, _flags: u32, reply: ReplyOpen) {
+    fn open(&mut self, _ino: u64, _flags: u32, reply: ReplyOpen) {
         reply.opened(0, 0);
     }
 
@@ -254,15 +223,7 @@ pub trait Filesystem {
     /// return value of the read system call will reflect the return value of this
     /// operation. fh will contain the value set by the open method, or will be undefined
     /// if the open method didn't set any value.
-    fn read(
-        &mut self,
-        _req: &Request<'_>,
-        _ino: u64,
-        _fh: u64,
-        _offset: i64,
-        _size: u32,
-        reply: ReplyData,
-    ) {
+    fn read(&mut self, _ino: u64, _fh: u64, _offset: i64, _size: u32, reply: ReplyData) {
         reply.error(ENOSYS);
     }
 
@@ -275,7 +236,6 @@ pub trait Filesystem {
     #[allow(clippy::too_many_arguments)]
     fn write(
         &mut self,
-        _req: &Request<'_>,
         _ino: u64,
         _fh: u64,
         _offset: i64,
@@ -296,14 +256,7 @@ pub trait Filesystem {
     /// is not forced to flush pending writes. One reason to flush data, is if the
     /// filesystem wants to return write errors. If the filesystem supports file locking
     /// operations (setlk, getlk) it should remove all locks belonging to 'lock_owner'.
-    fn flush(
-        &mut self,
-        _req: &Request<'_>,
-        _ino: u64,
-        _fh: u64,
-        _lock_owner: u64,
-        reply: ReplyEmpty,
-    ) {
+    fn flush(&mut self, _ino: u64, _fh: u64, _lock_owner: u64, reply: ReplyEmpty) {
         reply.error(ENOSYS);
     }
 
@@ -318,7 +271,6 @@ pub trait Filesystem {
     #[allow(clippy::too_many_arguments)]
     fn release(
         &mut self,
-        _req: &Request<'_>,
         _ino: u64,
         _fh: u64,
         _flags: u32,
@@ -332,14 +284,7 @@ pub trait Filesystem {
     /// Synchronize file contents.
     /// If the datasync parameter is non-zero, then only the user data should be flushed,
     /// not the meta data.
-    fn fsync(
-        &mut self,
-        _req: &Request<'_>,
-        _ino: u64,
-        _fh: u64,
-        _datasync: bool,
-        reply: ReplyEmpty,
-    ) {
+    fn fsync(&mut self, _ino: u64, _fh: u64, _datasync: bool, reply: ReplyEmpty) {
         reply.error(ENOSYS);
     }
 
@@ -350,7 +295,7 @@ pub trait Filesystem {
     /// anything in fh, though that makes it impossible to implement standard conforming
     /// directory stream operations in case the contents of the directory can change
     /// between opendir and releasedir.
-    fn opendir(&mut self, _req: &Request<'_>, _ino: u64, _flags: u32, reply: ReplyOpen) {
+    fn opendir(&mut self, _ino: u64, _flags: u32, reply: ReplyOpen) {
         reply.opened(0, 0);
     }
 
@@ -359,14 +304,7 @@ pub trait Filesystem {
     /// requested size. Send an empty buffer on end of stream. fh will contain the
     /// value set by the opendir method, or will be undefined if the opendir method
     /// didn't set any value.
-    fn readdir(
-        &mut self,
-        _req: &Request<'_>,
-        _ino: u64,
-        _fh: u64,
-        _offset: i64,
-        reply: ReplyDirectory,
-    ) {
+    fn readdir(&mut self, _ino: u64, _fh: u64, _offset: i64, reply: ReplyDirectory) {
         reply.error(ENOSYS);
     }
 
@@ -374,14 +312,7 @@ pub trait Filesystem {
     /// For every opendir call there will be exactly one releasedir call. fh will
     /// contain the value set by the opendir method, or will be undefined if the
     /// opendir method didn't set any value.
-    fn releasedir(
-        &mut self,
-        _req: &Request<'_>,
-        _ino: u64,
-        _fh: u64,
-        _flags: u32,
-        reply: ReplyEmpty,
-    ) {
+    fn releasedir(&mut self, _ino: u64, _fh: u64, _flags: u32, reply: ReplyEmpty) {
         reply.ok();
     }
 
@@ -389,19 +320,12 @@ pub trait Filesystem {
     /// If the datasync parameter is set, then only the directory contents should
     /// be flushed, not the meta data. fh will contain the value set by the opendir
     /// method, or will be undefined if the opendir method didn't set any value.
-    fn fsyncdir(
-        &mut self,
-        _req: &Request<'_>,
-        _ino: u64,
-        _fh: u64,
-        _datasync: bool,
-        reply: ReplyEmpty,
-    ) {
+    fn fsyncdir(&mut self, _ino: u64, _fh: u64, _datasync: bool, reply: ReplyEmpty) {
         reply.error(ENOSYS);
     }
 
     /// Get file system statistics.
-    fn statfs(&mut self, _req: &Request<'_>, _ino: u64, reply: ReplyStatfs) {
+    fn statfs(&mut self, _ino: u64, reply: ReplyStatfs) {
         reply.statfs(0, 0, 0, 0, 0, 512, 255, 0);
     }
 
@@ -409,7 +333,6 @@ pub trait Filesystem {
     #[allow(clippy::too_many_arguments)]
     fn setxattr(
         &mut self,
-        _req: &Request<'_>,
         _ino: u64,
         _name: &OsStr,
         _value: &[u8],
@@ -424,14 +347,7 @@ pub trait Filesystem {
     /// If `size` is 0, the size of the value should be sent with `reply.size()`.
     /// If `size` is not 0, and the value fits, send it with `reply.data()`, or
     /// `reply.error(ERANGE)` if it doesn't.
-    fn getxattr(
-        &mut self,
-        _req: &Request<'_>,
-        _ino: u64,
-        _name: &OsStr,
-        _size: u32,
-        reply: ReplyXattr,
-    ) {
+    fn getxattr(&mut self, _ino: u64, _name: &OsStr, _size: u32, reply: ReplyXattr) {
         reply.error(ENOSYS);
     }
 
@@ -439,12 +355,12 @@ pub trait Filesystem {
     /// If `size` is 0, the size of the value should be sent with `reply.size()`.
     /// If `size` is not 0, and the value fits, send it with `reply.data()`, or
     /// `reply.error(ERANGE)` if it doesn't.
-    fn listxattr(&mut self, _req: &Request<'_>, _ino: u64, _size: u32, reply: ReplyXattr) {
+    fn listxattr(&mut self, _ino: u64, _size: u32, reply: ReplyXattr) {
         reply.error(ENOSYS);
     }
 
     /// Remove an extended attribute.
-    fn removexattr(&mut self, _req: &Request<'_>, _ino: u64, _name: &OsStr, reply: ReplyEmpty) {
+    fn removexattr(&mut self, _ino: u64, _name: &OsStr, reply: ReplyEmpty) {
         reply.error(ENOSYS);
     }
 
@@ -452,7 +368,7 @@ pub trait Filesystem {
     /// This will be called for the access() system call. If the 'default_permissions'
     /// mount option is given, this method is not called. This method is not called
     /// under Linux kernel versions 2.4.x
-    fn access(&mut self, _req: &Request<'_>, _ino: u64, _mask: u32, reply: ReplyEmpty) {
+    fn access(&mut self, _ino: u64, _mask: u32, reply: ReplyEmpty) {
         reply.error(ENOSYS);
     }
 
@@ -466,15 +382,7 @@ pub trait Filesystem {
     /// structure in <fuse_common.h> for more details. If this method is not
     /// implemented or under Linux kernel versions earlier than 2.6.15, the mknod()
     /// and open() methods will be called instead.
-    fn create(
-        &mut self,
-        _req: &Request<'_>,
-        _parent: u64,
-        _name: &OsStr,
-        _mode: u32,
-        _flags: u32,
-        reply: ReplyCreate,
-    ) {
+    fn create(&mut self, _parent: u64, _name: &OsStr, _mode: u32, _flags: u32, reply: ReplyCreate) {
         reply.error(ENOSYS);
     }
 
@@ -482,7 +390,6 @@ pub trait Filesystem {
     #[allow(clippy::too_many_arguments)]
     fn getlk(
         &mut self,
-        _req: &Request<'_>,
         _ino: u64,
         _fh: u64,
         _lock_owner: u64,
@@ -505,7 +412,6 @@ pub trait Filesystem {
     #[allow(clippy::too_many_arguments)]
     fn setlk(
         &mut self,
-        _req: &Request<'_>,
         _ino: u64,
         _fh: u64,
         _lock_owner: u64,
@@ -522,21 +428,14 @@ pub trait Filesystem {
     /// Map block index within file to block index within device.
     /// Note: This makes sense only for block device backed filesystems mounted
     /// with the 'blkdev' option
-    fn bmap(
-        &mut self,
-        _req: &Request<'_>,
-        _ino: u64,
-        _blocksize: u32,
-        _idx: u64,
-        reply: ReplyBmap,
-    ) {
+    fn bmap(&mut self, _ino: u64, _blocksize: u32, _idx: u64, reply: ReplyBmap) {
         reply.error(ENOSYS);
     }
 
     /// macOS only: Rename the volume. Set fuse_init_out.flags during init to
     /// FUSE_VOL_RENAME to enable
     #[cfg(target_os = "macos")]
-    fn setvolname(&mut self, _req: &Request<'_>, _name: &OsStr, reply: ReplyEmpty) {
+    fn setvolname(&mut self, _name: &OsStr, reply: ReplyEmpty) {
         reply.error(ENOSYS);
     }
 
@@ -544,7 +443,7 @@ pub trait Filesystem {
     #[cfg(target_os = "macos")]
     fn exchange(
         &mut self,
-        _req: &Request<'_>,
+
         _parent: u64,
         _name: &OsStr,
         _newparent: u64,
@@ -558,7 +457,7 @@ pub trait Filesystem {
     /// macOS only: Query extended times (bkuptime and crtime). Set fuse_init_out.flags
     /// during init to FUSE_XTIMES to enable
     #[cfg(target_os = "macos")]
-    fn getxtimes(&mut self, _req: &Request<'_>, _ino: u64, reply: ReplyXTimes) {
+    fn getxtimes(&mut self, _ino: u64, reply: ReplyXTimes) {
         reply.error(ENOSYS);
     }
 }
