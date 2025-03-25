@@ -141,7 +141,6 @@ impl Filesystem for MemoryFS {
 
     fn release(
         &mut self,
-
         _ino: u64,
         _fh: u64,
         _flags: u32,
@@ -155,7 +154,6 @@ impl Filesystem for MemoryFS {
     // Create a new file
     fn create(
         &mut self,
-
         parent: u64,
         name: &std::ffi::OsStr,
         _mode: u32,
@@ -207,7 +205,6 @@ impl Filesystem for MemoryFS {
 
     fn setattr(
         &mut self,
-
         ino: u64,
         mode: Option<u32>,
         uid: Option<u32>,
@@ -227,20 +224,19 @@ impl Filesystem for MemoryFS {
             return;
         };
 
-        mode.map(|mode| file_attr.perm = mode as u16);
-        uid.map(|uid| file_attr.uid = uid);
-        gid.map(|gid| file_attr.gid = gid);
-        size.map(|size| file_attr.size = size);
-        atime.map(|atime| file_attr.atime = atime);
-        mtime.map(|mtime| file_attr.mtime = mtime);
-        crtime.map(|crtime| file_attr.crtime = crtime);
-        flags.map(|flags| file_attr.flags = flags);
+        mode.inspect(|&mode| file_attr.perm = mode as u16);
+        uid.inspect(|&uid| file_attr.uid = uid);
+        gid.inspect(|&gid| file_attr.gid = gid);
+        size.inspect(|&size| file_attr.size = size);
+        atime.inspect(|&atime| file_attr.atime = atime);
+        mtime.inspect(|&mtime| file_attr.mtime = mtime);
+        crtime.inspect(|&crtime| file_attr.crtime = crtime);
+        flags.inspect(|&flags| file_attr.flags = flags);
         reply.attr(&Duration::new(1, 0), file_attr);
     }
 
     fn write(
         &mut self,
-
         ino: u64,
         _fh: u64,
         offset: i64,
